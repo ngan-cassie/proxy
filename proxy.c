@@ -203,7 +203,7 @@ int parse_url(char *url, char *hostname, char *pathname, int *port) {
     }
     else {
 	    pathbegin++;	
-	    strcpy(pathname, hostend);
+	    strcpy(pathname, pathbegin);
    }
 
     return 0;
@@ -228,7 +228,7 @@ void build_header(char *http_header, char *hostname, char *path, int port, rio_t
     const char *proxy_connection_key = "Proxy-Connection";
     const char *host_key = "Host";
 
-    sprintf(request_header, "GET %s HTTP/1.0\r\n", path);
+    sprintf(request_header, "GET /%s HTTP/1.0\r\n", path);
 
     /* get other request header for client rio and change it */
     while(rio_readlineb(client_rio, buf, MAXLINE) > 0) {
