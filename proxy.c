@@ -23,7 +23,7 @@ struct format_args {
     int fd;
 };
 
-void *thread(void *vargp); // to be used for pthreads
+void *thread(void *vargp); 
 void build_header(char *http_header, char *hostname, char *path, int port, rio_t *client_rio);
 int parse_url(char *url, char *hostname, char *pathname, int *port);
 int connect_to_end_server(char *hostname, int port);
@@ -57,7 +57,6 @@ int main(int argc, char **argv) {
         printf("Accepted connection from (%s, %s)\n", hostname, port);
 
         /* sequential request */
-        // TODO: Update to handle concurrent requests using pthreads
         thread(formargs);
 
         // Free the memory allocated for formargs after each request
@@ -74,7 +73,6 @@ int main(int argc, char **argv) {
  *  handle multithreading and function calls 
  *  for each threaded connection request.
  *  is currently sequential
- *  TODO: call inside pthreads function to create concurrent requests
  */
 void *thread(void *vargp) {
     struct format_args *formargs = (struct format_args *)vargp;

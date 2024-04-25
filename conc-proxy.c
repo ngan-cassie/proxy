@@ -33,7 +33,7 @@ struct format_args {
     int fd;
 };
 
-void *thread(void *vargp); // to be used for pthreads
+void *thread(void *vargp); 
 void build_header(char *http_header, char *hostname, char *path, int port, rio_t *client_rio);
 int parse_url(char *url, char *hostname, char *pathname, int *port);
 int connect_to_end_server(char *hostname, int port);
@@ -49,7 +49,6 @@ int main(int argc, char **argv) {
     socklen_t clientlen;
 
     struct format_args *formargs; 
-    formargs = malloc(sizeof(struct sockaddr_in) + sizeof(int));
 
     /* Ignores SIGPIPE signal */
     Signal(SIGPIPE, SIG_IGN);
@@ -60,7 +59,11 @@ int main(int argc, char **argv) {
     }
 
     listenfd = Open_listenfd(argv[1]);
+
+    /* TODO: Open and read the blocklist file into an array */
+
     while (1) {
+        formargs = malloc(sizeof(struct sockaddr_in) + sizeof(int));
 		clientlen = sizeof(formargs->sock);
 		formargs->fd = Accept(listenfd, (SA *)&(formargs->sock), &clientlen);
 		pthread_t tid;
@@ -69,8 +72,6 @@ int main(int argc, char **argv) {
 		printf("Accepted connection from (%s, %s)\n", hostname, port);
 
 		pthread_create(&tid, NULL, thread, formargs);
-		
-		formargs = malloc(sizeof(struct sockaddr_in) + sizeof(int));
 
     }
     
@@ -123,9 +124,7 @@ void *thread(void *vargp) {
         return (void *)0;
     }
 
-    printf("url after parsing %s\n", url);
-    printf("hostname %s\n", hostname);
-    printf("path %s\n", path);
+    /* TODO: check malicious website */
 
     /* build the http header which will send to the end server */
     build_header(endserver_http_header, hostname, path, port, &rio);
@@ -353,14 +352,6 @@ void format_log_entry(char *logstring, struct sockaddr_in sockaddr,
  * write to the file
  */
 void print_log(char* log) {
-	/*
-    sem_t mutex;
-    if(sem_init(&mutex, 0, 1) < 0) {
-        fprintf(stderr, "Could not initialize semaphore in print_log(): %s\n", strerror(errno));
-        return;
-    }
-	*/ 
-
     P(&mutex); // one log at a time to handle concurrent requests
     if(access(file, F_OK) == 0) {
         // append file to proxy.log
