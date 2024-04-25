@@ -1,5 +1,5 @@
 /*
- * proxy.c - CS:APP Web proxy
+ * conc-proxy.c - CS:APP Web proxy (multithreaded ver)
  * TEAM MEMBERS: 
  *     Ngan Nguyen nguyenh0@sewanee.edu
  *     David Allen allendj0@sewanee.edu
@@ -17,6 +17,16 @@
 
 extern int errno;
 
+/* Global variables */
+FILE *proxy_log;
+volatile char *file = "proxy.log";
+sem_t mutex;
+
+void init_log_mutex() {
+    Sem_init(&mutex, 0, 1); // Initialize semaphore for single access
+}
+
+
 /* Struct definitions */
 struct format_args {
     struct sockaddr_in sock;
@@ -33,12 +43,12 @@ void print_log(char* log);
 
 
 int main(int argc, char **argv) {
+	init_log_mutex();
     int listenfd;
     char hostname[MAXLINE], port[MAXLINE];
     socklen_t clientlen;
 
     struct format_args *formargs; 
-    formargs = malloc(sizeof(struct sockaddr_in) + sizeof(int));
 
     /* Ignores SIGPIPE signal */
     Signal(SIGPIPE, SIG_IGN);
@@ -49,19 +59,19 @@ int main(int argc, char **argv) {
     }
 
     listenfd = Open_listenfd(argv[1]);
+
+    /* TODO: Open and read the blocklist file into an array */
+
     while (1) {
-	clientlen = sizeof(formargs->sock);
-	formargs->fd = Accept(listenfd, (SA *)&(formargs->sock), &clientlen);
-
-        Getnameinfo((SA *) &(formargs->sock), clientlen, hostname, MAXLINE, port, MAXLINE, 0);
-        printf("Accepted connection from (%s, %s)\n", hostname, port);
-
-        /* sequential request */
-        thread(formargs);
-
-        // Free the memory allocated for formargs after each request
-        free(formargs);
         formargs = malloc(sizeof(struct sockaddr_in) + sizeof(int));
+		clientlen = sizeof(formargs->sock);
+		formargs->fd = Accept(listenfd, (SA *)&(formargs->sock), &clientlen);
+		pthread_t tid;
+		
+		Getnameinfo((SA *) &(formargs->sock), clientlen, hostname, MAXLINE, port, MAXLINE, 0);
+		printf("Accepted connection from (%s, %s)\n", hostname, port);
+
+		pthread_create(&tid, NULL, thread, formargs);
 
     }
     
@@ -72,11 +82,12 @@ int main(int argc, char **argv) {
 /* 
  *  handle multithreading and function calls 
  *  for each threaded connection request.
- *  is currently sequential
  */
 void *thread(void *vargp) {
     struct format_args *formargs = (struct format_args *)vargp;
     int fd = formargs->fd;
+	Pthread_detach(pthread_self());
+	Free(vargp);
     struct sockaddr_in clientaddr = formargs->sock;
 
     int end_serverfd = 0;/*the end server file descriptor*/
@@ -113,9 +124,7 @@ void *thread(void *vargp) {
         return (void *)0;
     }
 
-    printf("url after parsing %s\n", url);
-    printf("hostname %s\n", hostname);
-    printf("path %s\n", path);
+    /* TODO: check malicious website */
 
     /* build the http header which will send to the end server */
     build_header(endserver_http_header, hostname, path, port, &rio);
@@ -159,7 +168,6 @@ void *thread(void *vargp) {
     
     Close(end_serverfd); 
     Close(fd);
-
     return (void *)0;
 }
 
@@ -344,15 +352,6 @@ void format_log_entry(char *logstring, struct sockaddr_in sockaddr,
  * write to the file
  */
 void print_log(char* log) {
-    sem_t mutex;
-    if(sem_init(&mutex, 0, 1) < 0) {
-        fprintf(stderr, "Could not initialize semaphore in print_log(): %s\n", strerror(errno));
-        return;
-    }
-	
-    FILE *proxy_log;
-    char *file = "proxy.log";
-
     P(&mutex); // one log at a time to handle concurrent requests
     if(access(file, F_OK) == 0) {
         // append file to proxy.log
@@ -366,3 +365,4 @@ void print_log(char* log) {
     fclose(proxy_log);
     V(&mutex);
 }
+
