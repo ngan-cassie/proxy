@@ -25,8 +25,7 @@ sem_t mutex;
 
 
 char **blocklist; 
-int blocklist_size = 0; //number of entries
-
+int blocklist_size = 0; 
 
 
 void init_log_mutex() {
@@ -45,7 +44,7 @@ void build_header(char *http_header, char *hostname, char *path, int port, rio_t
 int parse_url(char *url, char *hostname, char *pathname, int *port);
 int connect_to_end_server(char *hostname, int port);
 void format_log_entry(char *logstring, struct sockaddr_in sockaddr, 
-		      char *url, int size);
+		      char *url, int size, int is_malicious);
 void print_log(char* log);
 void load_blocklist(const char *filename);
 int is_blocked(const char *url);
@@ -142,7 +141,7 @@ void *thread(void *vargp) {
         int message_length = strlen(block_message);
         
         //log the blocked url request
-        format_log_entry(logdata, clientaddr, url, message_length);
+        format_log_entry(logdata, clientaddr, url, message_length, 1); //1 for malicious
         
         printf("\n\nLogged: %s\n\n", logdata);
 
@@ -187,7 +186,7 @@ void *thread(void *vargp) {
     }
 
     /* Formats the log entry of the request and sends it to the print_log() function */
-    format_log_entry(logdata, clientaddr, url, sizebuf);
+    format_log_entry(logdata, clientaddr, url, sizebuf, 0);
 
     printf("\n\nLogged: %s\n\n", logdata);
     
@@ -328,10 +327,11 @@ int connect_to_end_server(char *hostname, int port) {
  * 
  * The inputs are the socket address of the requesting client
  * (sockaddr), the URL from the request (url), and the size in bytes
- * of the response from the server (size).
+ * of the response from the server (size). is_malicious uses 1 for yes,
+ * 0 for no.
  */
 void format_log_entry(char *logstring, struct sockaddr_in sockaddr, 
-		      char *url, int size) {
+		      char *url, int size, int is_malicious) {
     time_t now;
     char time_str[MAXLINE];
     unsigned long host;
@@ -362,8 +362,11 @@ void format_log_entry(char *logstring, struct sockaddr_in sockaddr,
     d = host & 0xff;
 
     /* Store the formatted log entry string in logstring */
-    sprintf(logstring, "[%s] %d.%d.%d.%d %s %d\n", time_str, a, b, c, d, urlbase, size);
-    
+    if (is_malicious) {
+        sprintf(logstring, "[MALICIOUS] [%s] %d.%d.%d.%d %s %d\n", time_str, a, b, c, d, urlbase, size);
+    } else {
+        sprintf(logstring, "[%s] %d.%d.%d.%d %s %d\n", time_str, a, b, c, d, urlbase, size);
+    }
     /* Log the string in the proxy.log file */
     print_log(logstring);
 
@@ -392,7 +395,7 @@ void print_log(char* log) {
 }
 
 /*
- * Loads blocklist from file into a dynamically allocated array of strings.
+ * Loads blocklist from file into a dynamically allocated array.
  * Each line is assumed to be one URL. If the file cannot be opened it returns
  * without modifying the blocklist. 
  */
