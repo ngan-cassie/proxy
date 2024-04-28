@@ -17,6 +17,9 @@
 
 extern int errno;
 
+char **blocklist; 
+int blocklist_size = 0; 
+
 /* Struct definitions */
 struct format_args {
     struct sockaddr_in sock;
@@ -28,8 +31,10 @@ void build_header(char *http_header, char *hostname, char *path, int port, rio_t
 int parse_url(char *url, char *hostname, char *pathname, int *port);
 int connect_to_end_server(char *hostname, int port);
 void format_log_entry(char *logstring, struct sockaddr_in sockaddr, 
-		      char *url, int size);
+		      char *url, int size, int is_malicious);
 void print_log(char* log);
+void load_blocklist(const char *filename);
+int is_blocked(const char *url);
 
 
 int main(int argc, char **argv) {
@@ -49,6 +54,10 @@ int main(int argc, char **argv) {
     }
 
     listenfd = Open_listenfd(argv[1]);
+
+    load_blocklist("blocklist.txt");
+
+
     while (1) {
 	clientlen = sizeof(formargs->sock);
 	formargs->fd = Accept(listenfd, (SA *)&(formargs->sock), &clientlen);
@@ -112,10 +121,25 @@ void *thread(void *vargp) {
         printf("\nAddress must start with http://\n");
         return (void *)0;
     }
+/* handle blocked url requests */
+    if (is_blocked(hostname)) {
+        char block_message[1024];
+        sprintf(block_message, "HTTP/1.1 403 Forbidden\r\nContent-Type: text/html\r\n\r\n"
+                            "<html><body><h1>Blocked site</h1><p>Access to %s is blocked.</p>"
+                            "</body></html>\r\n", hostname);
 
-    printf("url after parsing %s\n", url);
-    printf("hostname %s\n", hostname);
-    printf("path %s\n", path);
+        int message_length = strlen(block_message);
+        
+        //log the blocked url request
+        format_log_entry(logdata, clientaddr, url, message_length, 1); //1 for malicious
+        
+        printf("\n\nLogged: %s\n\n", logdata);
+
+        //send block message to client
+        rio_writen(fd, block_message, strlen(block_message));
+        Close(fd);
+        return (void *)0;
+    }
 
     /* build the http header which will send to the end server */
     build_header(endserver_http_header, hostname, path, port, &rio);
@@ -153,7 +177,7 @@ void *thread(void *vargp) {
     }
 
     /* Formats the log entry of the request and sends it to the print_log() function */
-    format_log_entry(logdata, clientaddr, url, sizebuf);
+    format_log_entry(logdata, clientaddr, url, sizebuf, 0);
 
     printf("\n\nLogged: %s\n\n", logdata);
     
@@ -298,7 +322,7 @@ int connect_to_end_server(char *hostname, int port) {
  * of the response from the server (size).
  */
 void format_log_entry(char *logstring, struct sockaddr_in sockaddr, 
-		      char *url, int size) {
+		      char *url, int size, int is_malicious) {
     time_t now;
     char time_str[MAXLINE];
     unsigned long host;
@@ -329,7 +353,11 @@ void format_log_entry(char *logstring, struct sockaddr_in sockaddr,
     d = host & 0xff;
 
     /* Store the formatted log entry string in logstring */
-    sprintf(logstring, "[%s] %d.%d.%d.%d %s %d\n", time_str, a, b, c, d, urlbase, size);
+    if (is_malicious) {
+        sprintf(logstring, "[MALICIOUS] [%s] %d.%d.%d.%d %s %d\n", time_str, a, b, c, d, urlbase, size);
+    } else {
+        sprintf(logstring, "[%s] %d.%d.%d.%d %s %d\n", time_str, a, b, c, d, urlbase, size);
+    }
     
     /* Log the string in the proxy.log file */
     print_log(logstring);
@@ -365,4 +393,33 @@ void print_log(char* log) {
     fwrite(log, 1, strlen(log), proxy_log);
     fclose(proxy_log);
     V(&mutex);
+}
+
+/*
+ * Loads blocklist from file into a dynamically allocated array.
+ * Each line is assumed to be one URL. If the file cannot be opened it returns
+ * without modifying the blocklist. 
+ */
+void load_blocklist(const char *filename) {
+    char buf[MAXLINE];
+    FILE *fp = fopen(filename, "r");
+    if (!fp) return; // File not found, continue without blocklist
+
+    while (fgets(buf, MAXLINE, fp) != NULL) {
+        blocklist_size++;
+        blocklist = realloc(blocklist, blocklist_size * sizeof(char *));
+        buf[strlen(buf) - 1] = '\0'; // Remove newline character
+        blocklist[blocklist_size - 1] = strdup(buf); // Duplicate buf and store the new string pointer in the blocklist array.
+    }
+    fclose(fp);
+}
+
+/*Checks to see if url should be blocked by comparing it to blocklist*/
+int is_blocked(const char *url) {
+    for (int i = 0; i < blocklist_size; i++) {
+        if (strcmp(blocklist[i], url) == 0) {
+            return 1;  // True
+        }
+    }
+    return 0;  // False
 }
