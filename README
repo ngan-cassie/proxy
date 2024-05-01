@@ -1,23 +1,24 @@
 ####################################################################
-# CS:APP Proxy Lab
-#
-# Student Source Files
+# CS:APP Proxy Server
+# TEAM MEMBERS: 
+# Ngan Nguyen nguyenh0@sewanee.edu
+# David Allen allendj0@sewanee.edu
+# Bob Makazhu makazbr0@sewanee.edu
 ####################################################################
 
-This directory contains the files you will need for the CS:APP Proxy
-Lab.
+This is  directory contains the files you will need for two versions of a Web proxy that logs web requests while filtering out requests/replies from potentially malicious sites. 
 
 proxy.c
-csapp.h
-csapp.c
-    These are starter files.  csapp.c and csapp.h are described in
-    your textbook. 
-
-    You may make any changes you like to these files.  And you may
-    create and handin any additional files you like.
-
-    Please use `port-for-user.pl' or 'free-port.sh' to generate
-    unique ports for your proxy or tiny server. 
+    A simple single-threaded HTTP proxy that 
+        (1) accepts requests, logging each request to a text file
+        (2) forwards the request to the end server unless destination is a potentially malicious site
+        (3) returns the result back to the browser
+    To run the proxy, type a command-line argument specifying the port number on which it should listen for its connection requests
+    > ./proxy <port-number> 
+conc-proxy.c
+    Functions as the previous proxy version but also deas with multiple clients concurrently. It spawns separate threads to deal with each request. 
+    To run the proxy, type a command-line argument specifying the port number on which it should listen for its connection requests
+    > ./conc-proxy <port-number> 
 
 Makefile
     This is the makefile that builds the proxy program.  Type "make"
