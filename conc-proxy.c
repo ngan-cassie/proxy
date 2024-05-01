@@ -5,7 +5,7 @@
  *     David Allen allendj0@sewanee.edu
  *     Bob Makazhu makazbr0@sewanee.edu
 
- * Description: A proxy web server that intercepts client requests,
+ * Description: A proxy web server that intercepts client requests concurrently,
  * and logs the request infromation to proxy.log
  */ 
 
@@ -17,12 +17,9 @@
 
 extern int errno;
 
-/* Global variables */
 FILE *proxy_log;
 volatile char *file = "proxy.log";
 sem_t mutex;
-
-
 
 char **blocklist; 
 int blocklist_size = 0; 
