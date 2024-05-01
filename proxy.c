@@ -59,18 +59,18 @@ int main(int argc, char **argv) {
 
 
     while (1) {
-	clientlen = sizeof(formargs->sock);
-	formargs->fd = Accept(listenfd, (SA *)&(formargs->sock), &clientlen);
+        clientlen = sizeof(formargs->sock);
+        formargs->fd = Accept(listenfd, (SA *)&(formargs->sock), &clientlen);
 
-        Getnameinfo((SA *) &(formargs->sock), clientlen, hostname, MAXLINE, port, MAXLINE, 0);
-        printf("Accepted connection from (%s, %s)\n", hostname, port);
+            Getnameinfo((SA *) &(formargs->sock), clientlen, hostname, MAXLINE, port, MAXLINE, 0);
+            printf("Accepted connection from (%s, %s)\n", hostname, port);
 
-        /* sequential request */
-        thread(formargs);
+            /* sequential request */
+            thread(formargs);
 
-        // Free the memory allocated for formargs after each request
-        free(formargs);
-        formargs = malloc(sizeof(struct sockaddr_in) + sizeof(int));
+            // Free the memory allocated for formargs after each request
+            free(formargs);
+            formargs = malloc(sizeof(struct sockaddr_in) + sizeof(int));
 
     }
     
@@ -79,9 +79,8 @@ int main(int argc, char **argv) {
 
 
 /* 
- *  handle multithreading and function calls 
+ *  handle function calls 
  *  for each threaded connection request.
- *  is currently sequential
  */
 void *thread(void *vargp) {
     struct format_args *formargs = (struct format_args *)vargp;
